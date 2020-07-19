@@ -68,8 +68,9 @@ function DrawBox(px, py, width, height, thickness, color)
 end
 
 function GetSkillBoxColor(usable)
-    if usable == 0 then return 0xffff0000 end
+    --if usable == 0 then return 0xffff0000 end
     if usable == 1 then return 0xff00ff00 end
+    return 0xffff0000
 end
 
 function GetUltPercent(heroid, value)
@@ -110,7 +111,7 @@ function GetUltPercent(heroid, value)
 
     for i=1, #ultCooldownTable do
         if heroid == ultCooldownTable[i][1] then
-            return round(value / ultCooldownTable[i][2] * 100)
+            return round(string.unpack("f", string.pack("i4", value)) / ultCooldownTable[i][2] * 100)
         end
     end
 
@@ -163,12 +164,12 @@ function Visuals()
                 if (player:IsEnemy()) then --player:IsEnemy()
                     
                     --[[ ESP ]]--
-                    local box_width = 2;
+                    local box_width = 1;
                     local box_outline_width = 1;
 
                     --main box
                     local box_color = 0xffff0000
-                    if Game.Engine:RayCast(Game.Engine:GetLocalPlayer():GetMesh():GetBonePos(17), top3D).hittedPlayer:IsValid() then
+                    if Game.Engine:RayCast(Game.Engine:GetLocalPlayer():GetMesh():GetBonePos(17), Mesh:GetBonePos(player:GetBoneId((1)))).hittedPlayer:IsValid() then
                         box_color = 0xff00ff00
                     end
                     DrawBox(pointLU.x, pointLU.y, width2D, height2D, box_width, box_color)
@@ -214,7 +215,8 @@ function Visuals()
                     local skill_e = skill:GetSkillInfo(4, 0).isUsable
                     local skill_ult = skill:GetSkillInfo(8, 0).isUsable
                     
-                    local skillbox_size = 9
+                    local skillbox_size = height2D / 8
+                    if skillbox_size > 13 then skillbox_size = 13 end
                     local skillbox_margin_right = 4
                     local skillbox_margin_bottom = 2
                     local caption_margin = 2
@@ -222,12 +224,12 @@ function Visuals()
                     fromBar = Math.XMFLOAT2(bottom2D.x + (width2D / 2) + skillbox_margin_right, top2D.y)
                     toBar = Math.XMFLOAT2(fromBar.x + skillbox_size, fromBar.y + skillbox_size)
                     Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_e), 0, 0)
-                    Game.Renderer:DrawText("E", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                    Game.Renderer:DrawText("E:" .. skill_e, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                     
                     fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
                     toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
                     Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_shift), 0, 0)
-                    Game.Renderer:DrawText("SHIFT", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                    Game.Renderer:DrawText("Shift: " .. skill_shift, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
 
                     fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
                     toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
