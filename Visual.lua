@@ -353,7 +353,7 @@ function Visuals()
                         toBar = Math.XMFLOAT2(fromBar.x + skillbox_size, fromBar.y + skillbox_size)
                         if skill_1 >= 0 then
                             Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_1, false), 0, 0)
-                            Game.Renderer:DrawText(skill_1, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                            Game.Renderer:DrawText(string.format("%.1f", skill_1) .. "s", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                         else
                             --Game.Renderer:DrawText("Error", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                         end
@@ -362,7 +362,7 @@ function Visuals()
                         toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
                         if skill_2 >= 0 then
                             Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_2, false), 0, 0)
-                            Game.Renderer:DrawText(skill_2, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                            Game.Renderer:DrawText(string.format("%.1f", skill_2) .. "s", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                         else
                             --Game.Renderer:DrawText("Error", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                         end
@@ -371,7 +371,7 @@ function Visuals()
                         toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
                         if skill_3 >= 0 then
                             Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_3, false), 0, 0)
-                            Game.Renderer:DrawText(skill_3, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                            Game.Renderer:DrawText(string.format("%.1f", skill_3) .. "s", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                         else
                             --Game.Renderer:DrawText("Error", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                         end
