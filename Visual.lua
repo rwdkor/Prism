@@ -67,9 +67,10 @@ function DrawBox(px, py, width, height, thickness, color)
     Game.Renderer:DrawLine(point3, point4, color, thickness)  
 end
 
-function GetSkillBoxColor(usable)
+function GetSkillBoxColor(usable, bUlt)
     --if usable == 0 then return 0xffff0000 end
-    if usable == 1 or usable == "100" then return 0xff00ff00 end
+    if usable == 0 and bUlt == false then return 0xff00ff00 end
+    if bUlt == true and usable == "100" then return 0xff00ff00 end
     return 0xffff0000
 end
 
@@ -111,7 +112,7 @@ function GetUltPercent(heroid, value)
 
     for i=1, #ultCooldownTable do
         if heroid == ultCooldownTable[i][1] then
-            return round(string.unpack("f", string.pack("i4", value)) / ultCooldownTable[i][2] * 100)
+            return round(value / ultCooldownTable[i][2] * 100)
         end
     end
 
@@ -119,81 +120,127 @@ function GetUltPercent(heroid, value)
 end
 
 -- slot_id -> Slot Number
--- Return -> 0: Cooldown, 1: Available
+-- Return -> -2: Hero not found, -1: Disabled, Other: Cooltime / Optional -> Ult: UltGuage
 function GetSkillCooldown(player, slot_id)
     -- slot1, slot1type, slot2, slot2type, slot3, slot3type, slot4, slot4type,
     -- slottype - 1: isusing, 2: isusable, 3: isblocked, 4: isusing+isusable
     local skillCooldownTable = {
-        {0x02E000000000013B, 2, 2,  4, 2,  0, 2,  8, 2}, --Ana
-        {0x02E0000000000200, 2, 2,  4, 2,  0, 2,  8, 2}, --Ashe
-        {0x02E0000000000221, 2, 2,  4, 2,  0, 2,  8, 2}, --Baptiste
-        {0x02E0000000000015, 0, 2,  0, 2,  0, 2,  8, 2}, --Bastion
-        {0x02E0000000000195, 2, 2,  4, 2,  0, 2,  8, 2}, --Brigitte
-        {0x02E000000000012F, 2, 2,  0, 2,  7, 2,  8, 2}, --Doomfist
-        {0x02E000000000007A, 2, 2,  4, 2,  0, 2,  8, 2}, --D.Va
-        {0x02E0000000000206, 2, 2,  4, 2,  7, 2,  8, 2}, --Echo
-        {0x02E0000000000029, 2, 2,  4, 2,  0, 2,  8, 2}, --Gentji
-        {0x02E0000000000005, 2, 2,  4, 2,  0, 2,  8, 2}, --Hanzo
-        {0x02E0000000000065, 0, 2,  0, 2,  0, 2,  8, 2}, --Junkrat
-        {0x02E0000000000079, 0, 2,  4, 2,  7, 2,  8, 2}, --Lucio
-        {0x02E0000000000042, 2, 2,  4, 2,  0, 2,  8, 2}, --McCree
-        {0x02E00000000000DD, 2, 2,  4, 2,  0, 2,  8, 2}, --Mei
-        {0x02E0000000000004, 0, 2,  4, 2,  0, 2,  8, 2}, --Mercy
-        {0x02E00000000001A2, 2, 2,  4, 2,  0, 2,  8, 2}, --Moira
-        {0x02E000000000013E, 2, 2,  4, 2,  7, 2,  8, 2}, --Orisa
-        {0x02E0000000000008, 2, 2,  4, 2,  0, 2,  8, 2}, --Pharah
-        {0x02E0000000000002, 2, 2,  4, 2,  0, 2,  8, 2}, --Reaper
-        {0x02E0000000000007, 2, 2,  4, 2,  0, 2,  8, 2}, --Reinhardt
-        {0x02E0000000000040, 2, 2,  4, 2,  0, 2,  8, 2}, --Roadhog
-        {0x02E000000000023B, 2, 2,  4, 2,  0, 2,  8, 2}, --Sigma
-        {0x02E000000000006E, 0, 2,  4, 2,  7, 2,  8, 2}, --Soldier:76
-        {0x02E000000000012E, 2, 2,  4, 2,  0, 2,  8, 2}, --Sombra
-        {0x02E0000000000016, 2, 2,  4, 2,  0, 2,  8, 2}, --Symmetra
-        {0x02E0000000000006, 2, 2,  4, 2,  0, 2,  8, 2}, --Torbjorn
-        {0x02E0000000000003, 0, 2,  4, 2,  0, 2,  8, 2}, --Tracer
-        {0x02E000000000000A, 2, 2,  4, 2,  0, 2,  8, 2}, --Widowmaker
-        {0x02E0000000000009, 2, 2,  4, 2,  0, 2,  8, 2}, --Winston
-        {0x02E00000000001CA, 0, 2,  4, 2,  7, 2,  8, 2}, --Wrecking Ball
-        {0x02E0000000000068, 2, 4,  4, 4,  0, 2,  8, 2}, --Zarya
-        {0x02E0000000000020, 0, 2,  0, 2,  0, 2,  8, 2}  --Zenyatta
+        {0x02E000000000013B, 1, 2,  2, 2,  0, 2,  5, 4}, --Ana
+        {0x02E0000000000200, 1, 2,  2, 2,  0, 2,  5, 4}, --Ashe
+        {0x02E0000000000221, 1, 2,  2, 2,  0, 2,  5, 4}, --Baptiste
+        {0x02E0000000000015, 0, 2,  0, 2,  0, 2,  5, 4}, --Bastion
+        {0x02E0000000000195, 1, 2,  2, 2,  0, 2,  5, 4}, --Brigitte
+        {0x02E000000000012F, 1, 2,  0, 2,  4, 2,  5, 4}, --Doomfist
+        {0x02E000000000007A, 1, 2,  2, 2,  0, 2,  5, 4}, --D.Va
+        {0x02E0000000000206, 1, 2,  2, 2,  4, 2,  5, 4}, --Echo
+        {0x02E0000000000029, 1, 2,  2, 2,  0, 2,  5, 4}, --Genji
+        {0x02E0000000000005, 1, 2,  2, 2,  0, 2,  5, 4}, --Hanzo
+        {0x02E0000000000065, 0, 2,  0, 2,  0, 2,  5, 4}, --Junkrat
+        {0x02E0000000000079, 0, 2,  2, 2,  4, 2,  5, 4}, --Lucio
+        {0x02E0000000000042, 1, 2,  2, 2,  0, 2,  5, 4}, --McCree
+        {0x02E00000000000DD, 1, 2,  2, 2,  0, 2,  5, 4}, --Mei
+        {0x02E0000000000004, 0, 2,  2, 2,  0, 2,  5, 4}, --Mercy
+        {0x02E00000000001A2, 1, 2,  2, 2,  0, 2,  5, 4}, --Moira
+        {0x02E000000000013E, 1, 2,  2, 2,  4, 2,  5, 4}, --Orisa
+        {0x02E0000000000008, 1, 2,  2, 2,  0, 2,  5, 4}, --Pharah
+        {0x02E0000000000002, 1, 2,  2, 2,  0, 2,  5, 4}, --Reaper
+        {0x02E0000000000007, 1, 2,  2, 2,  0, 2,  5, 4}, --Reinhardt
+        {0x02E0000000000040, 1, 2,  2, 2,  0, 2,  5, 4}, --Roadhog
+        {0x02E000000000023B, 1, 2,  2, 2,  0, 2,  5, 4}, --Sigma
+        {0x02E000000000006E, 0, 2,  2, 2,  4, 2,  5, 4}, --Soldier:76
+        {0x02E000000000012E, 1, 2,  2, 2,  0, 2,  5, 4}, --Sombra
+        {0x02E0000000000016, 1, 2,  2, 2,  0, 2,  5, 4}, --Symmetra
+        {0x02E0000000000006, 1, 2,  2, 2,  0, 2,  5, 4}, --Torbjorn
+        {0x02E0000000000003, 1, 4,  2, 2,  0, 2,  5, 4}, --Tracer
+        {0x02E000000000000A, 1, 2,  2, 2,  0, 2,  5, 4}, --Widowmaker
+        {0x02E0000000000009, 1, 2,  2, 2,  0, 2,  5, 4}, --Winston
+        {0x02E00000000001CA, 0, 2,  2, 2,  4, 2,  5, 4}, --Wrecking Ball
+        {0x02E0000000000068, 1, 4,  2, 4,  0, 2,  5, 4}, --Zarya
+        {0x02E0000000000020, 0, 2,  0, 2,  0, 2,  5, 4}, --Zenyatta
+    }
+
+    -- shift, e, r
+    local skillIDTable = {
+        {0x02E000000000013B,  0x3D, 6,  0x3D, 4,  -1, -1,  -1, -1}, --Ana
+        {0x02E0000000000200,  0x3D, 6,  0x3D, 3,  -1, -1,  -1, -1}, --Ashe
+        {0x02E0000000000221,  0x3D, 5,  0x3D, 4,  -1, -1,  -1, -1}, --Baptiste
+        {0x02E0000000000015,  -1, -1,  -1, -1,  -1, -1,  -1, -1}, --Bastion
+        {0x02E0000000000195,  0x3D, 6,  0x3D, 7,  0x3306, 4,  -1, -1}, --Brigitte
+        {0x02E000000000012F,  0x3D, 6,  0x3D, 8,  0x3D, 5,  -1, -1}, --Doomfist
+        {0x02E000000000007A,  0x3D, 5,  0x3D, 9,  0x3D, 4,  -1, -1}, --D.Va
+        {0x02E0000000000206,  0x3D, 4,  0x3D, 6,  0x3D, 7,  -1, -1}, --Echo
+        {0x02E0000000000029,  0x3D, 6,  0x3D, 7,  -1, -1,  -1, -1}, --Genji
+        {0x02E0000000000005,  0x3D, 4,  0x3D, 5,  -1, -1,  -1, -1}, --Hanzo
+        {0x02E0000000000065,  0x3D, 6,  0x3D, 7,  -1, -1,  -1, -1}, --Junkrat
+        {0x02E0000000000079,  -1, -1,  0x3D, 6,  0x3D, 9,  -1, -1}, --Lucio
+        {0x02E0000000000042,  0x3D, 6,  0x3D, 7,  -1, -1,  -1, -1}, --McCree
+        {0x02E00000000000DD,  0x3D, 4,  0x3D, -1,  -1, -1,  -1, -1}, --Mei
+        {0x02E0000000000004, -1, -1,  -1, -1,  -1, -1,  -1, -1}, --Mercy
+        {0x02E00000000001A2,  0x3D, 6,  0x3D, 4,  -1, -1,  -1, -1}, --Moira
+        {0x02E000000000013E,  0x3D, 6,  0x3D, 4,  0x3D, 5,  -1, -1}, --Orisa
+        {0x02E0000000000008,  0x3D, 2,  0x3D, 7,  -1, -1,  -1, -1}, --Pharah
+        {0x02E0000000000002,  0x3D, 1,  0x3D, -1,  -1, -1,  -1, -1}, --Reaper
+        {0x02E0000000000007,  0x3D, 2,  0x3D, 7,  -1, -1,  -1, -1}, --Reinhardt
+        {0x02E0000000000040,  0x3D, 3,  0x3D, 7,  -1, -1,  -1, -1}, --Roadhog
+        {0x02E000000000023B,  0x3D, 5,  0x3D, 6,  -1, -1,  -1, -1}, --Sigma
+        {0x02E000000000006E,  -1, -1,  0x3D, 6,  0x3D, 10,  -1, -1}, --Soldier:76
+        {0x02E000000000012E,  0x3D, 7,  0x3D, 6,  -1, -1,  -1, -1}, --Sombra
+        {0x02E0000000000016,  0x3D, 5,  0x3D, -1,  -1, -1,  -1, -1}, --Symmetra
+        {0x02E0000000000006, -1, -1,  -1, -1,  -1, -1,  -1, -1}, --Torbjorn
+        {0x02E0000000000003,  0x3D, 2,  0x3D, 1,  -1, -1,  -1, -1}, --Tracer
+        {0x02E000000000000A,  0x3D, 4,  0x3D, 3,  -1, -1,  -1, -1}, --Widowmaker
+        {0x02E0000000000009,  0x3D, 6,  0x3D, 3,  -1, -1,  -1, -1}, --Winston
+        {0x02E00000000001CA, -1, -1,  0x3D, 10, 0x3D, 7,  -1, -1}, --Wrecking Ball
+        {0x02E0000000000068,  0x3D, 5,  0x3D, -1,  -1, -1,  -1, -1}, --Zarya
+        {0x02E0000000000020, -1, -1,  -1, -1,  -1, -1,  -1, -1},  --Zenyatta
     }
 
     local heroid = player:GetIdentifier().HeroID
+    local skill_cooldown = -2
 
     for i=1, #skillCooldownTable do
         if heroid == skillCooldownTable[i][1] then
-            local slot_skill = skillCooldownTable[i][slotid * 2]
-            local slot_type = skillCooldownTable[i][slotid * 2 + 1]
+            
+            local slot_skill = skillCooldownTable[i][slot_id * 2]
+            local slot_type = skillCooldownTable[i][slot_id * 2 + 1]
 
             if slot_skill ~= 0 then
+                --if skillIDTable[i][slot_id * 2] == -1 then return -1 end
+
                 local skill = player:GetSkill():GetSkillInfo(slot_skill, 0)
-                local skill_status
-                local skill_cooldown = 0
+                --if heroid == 0x02E0000000000003 then Game.Renderer:DrawText(slot_skill .. " / " .. slot_type .. "", 15, 35, 15, 0xffffffff, false) end
+                local skill_cool = player:GetSkill():GetSkillInfo(skillIDTable[i][slot_id * 2], skillIDTable[i][slot_id * 2 + 1])
+
+                local skill_status = 0
 
                 if slot_type == 1 then
                     skill_status = skill.isUsing
-                    skill_cooldown = skill:GetCoolTime().x
+                    if skill_status == 1 then skill_cooldown = skill_cool:GetCoolTime().x
+                    else skill_cooldown = skill_cool:GetCoolTime().y end
                 elseif slot_type == 2 then
-                    skill_status = skill.isUsable
-                    skill_cooldown = skill:GetCoolTime().y
+                    if slot_skill ~= 5 then skill_cooldown = skill_cool:GetCoolTime().y
+                    else skill_cooldown = skill.flUltGauge end
                 elseif slot_type == 3 then
                     skill_status = skill.isBlocked
                     skill_cooldown = 0
                 elseif slot_type == 4 then
                     skill_status = skill.isUsing
-                    skill_cooldown = skill:GetCoolTime().x
-                    if skill_status ~= 1 then
-                        skill_status = skill.isUsable
-                        skill_cooldown = skill:GetCoolTime().y
+                    if skill_status == 1 then
+                        if slot_skill ~= 5 then skill_cooldown = skill_cool:GetCoolTime().x
+                        else skill_cooldown = 0 end
+                    else
+                        if slot_skill ~= 5 then skill_cooldown = skill_cool:GetCoolTime().y
+                        else skill_cooldown = skill.flUltGauge end
                     end
                 end
+            else
+                skill_cooldown = -1
             end
 
             return skill_cooldown
         end
     end
-
-    return -1
+    return -2
 end
 
 function Visuals()
@@ -284,34 +331,56 @@ function Visuals()
                         Game.Renderer:DrawBoxFilled(fromBar, toBar, 0xffff0000, 0, 0) --red
                     end
 
+                    
                     --[[ Tracker ]]
+                    local heroid = player:GetIdentifier().HeroID
                     local skill = player:GetSkill()
 
-                    local skill_shift = skill:GetSkillInfo(2, 0).isUsable
-                    local skill_e = skill:GetSkillInfo(4, 0).isUsable
-                    local skill_ult = skill:GetSkillInfo(8, 0).isUsable
+                    local skill_1 = GetSkillCooldown(player, 1)
+                    local skill_2 = GetSkillCooldown(player, 2)
+                    local skill_3 = GetSkillCooldown(player, 3)
+                    local skill_ult = GetSkillCooldown(player, 4)
                     
-                    local skillbox_size = height2D / 4
+                    local skillbox_size = height2D / 5
                     if skillbox_size > 13 then skillbox_size = 13
-                    elseif skillbox_size < 7 then skillbox_size = 7 end
+                    elseif skillbox_size < 4 then skillbox_size = 0 end
                     local skillbox_margin_right = 4
                     local skillbox_margin_bottom = 2
                     local caption_margin = 2
 
-                    fromBar = Math.XMFLOAT2(bottom2D.x + (width2D / 2) + skillbox_margin_right, top2D.y)
-                    toBar = Math.XMFLOAT2(fromBar.x + skillbox_size, fromBar.y + skillbox_size)
-                    Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_e), 0, 0)
-                    Game.Renderer:DrawText("E:" .. skill_e, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
-                    
-                    fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
-                    toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
-                    Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_shift), 0, 0)
-                    Game.Renderer:DrawText("Shift: " .. skill_shift, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                    if skillbox_size ~= 0 then
+                        fromBar = Math.XMFLOAT2(bottom2D.x + (width2D / 2) + skillbox_margin_right, top2D.y)
+                        toBar = Math.XMFLOAT2(fromBar.x + skillbox_size, fromBar.y + skillbox_size)
+                        if skill_1 >= 0 then
+                            Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_1, false), 0, 0)
+                            Game.Renderer:DrawText(skill_1, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                        else
+                            --Game.Renderer:DrawText("Error", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                        end
 
-                    fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
-                    toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
-                    Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(GetUltPercent(heroid, skill_ult)), 0, 0)
-                    Game.Renderer:DrawText(GetUltPercent(heroid, skill_ult) .. "%", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                        fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
+                        toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
+                        if skill_2 >= 0 then
+                            Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_2, false), 0, 0)
+                            Game.Renderer:DrawText(skill_2, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                        else
+                            --Game.Renderer:DrawText("Error", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                        end
+
+                        fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
+                        toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
+                        if skill_3 >= 0 then
+                            Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_3, false), 0, 0)
+                            Game.Renderer:DrawText(skill_3, fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                        else
+                            --Game.Renderer:DrawText("Error", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                        end
+
+                        fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
+                        toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
+                        Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(GetUltPercent(heroid, skill_ult), true), 0, 0)
+                        Game.Renderer:DrawText(GetUltPercent(heroid, skill_ult) .. "%", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
+                    end
                 end
             end
             do break end
