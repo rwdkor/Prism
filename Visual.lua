@@ -69,7 +69,7 @@ end
 
 function GetSkillBoxColor(usable, bUlt)
     --if usable == 0 then return 0xffff0000 end
-    if usable == 0 and bUlt == false then return 0xff00ff00 end
+    if (usable == "0.0" or usable == 0) and bUlt == false then return 0xff00ff00 end
     if bUlt == true and usable == "100" then return 0xff00ff00 end
     return 0xffff0000
 end
@@ -130,7 +130,7 @@ function GetSkillCooldown(player, slot_id)
         {0x02E0000000000221, 1, 2,  2, 2,  0, 2,  5, 4}, --Baptiste
         {0x02E0000000000015, 0, 2,  0, 2,  0, 2,  5, 4}, --Bastion
         {0x02E0000000000195, 1, 2,  2, 2,  0, 2,  5, 4}, --Brigitte
-        {0x02E000000000012F, 1, 2,  0, 2,  4, 2,  5, 4}, --Doomfist
+        {0x02E000000000012F, 1, 2,  2, 2,  4, 2,  5, 4}, --Doomfist
         {0x02E000000000007A, 1, 2,  2, 2,  0, 2,  5, 4}, --D.Va
         {0x02E0000000000206, 1, 2,  2, 2,  4, 2,  5, 4}, --Echo
         {0x02E0000000000029, 1, 2,  2, 2,  0, 2,  5, 4}, --Genji
@@ -294,7 +294,7 @@ function Visuals()
 
                     --main box
                     local box_color = 0xffff0000
-                    if Game.Engine:RayCast(Game.Engine:GetLocalPlayer():GetMesh():GetBonePos(17), Mesh:GetBonePos(player:GetBoneId((1)))).hittedPlayer:IsValid() then
+                    if Game.Engine:RayCast(Game.Engine:GetLocalPlayer():GetMesh():GetBonePos(0x11), Mesh:GetBonePos(player:GetBoneId(1))).hittedPlayer:IsValid() then
                         box_color = 0xff00ff00
                     end
                     DrawBox(pointLU.x, pointLU.y, width2D, height2D, box_width, box_color)
@@ -305,7 +305,6 @@ function Visuals()
                     --box outline2
                     DrawBox(pointLU.x + box_width, pointLU.y + box_width, width2D - box_width * 2, height2D - box_width * 2, box_outline_width, 0xff000000)
                    
-
 
                     --[[ Health ]]
                     local heightBar = height2D * (currenthealth / maxhealth)
@@ -342,7 +341,7 @@ function Visuals()
                     local skill_ult = GetSkillCooldown(player, 4)
                     
                     local skillbox_size = height2D / 5
-                    if skillbox_size > 13 then skillbox_size = 13
+                    if skillbox_size > 17 then skillbox_size = 17
                     elseif skillbox_size < 4 then skillbox_size = 0 end
                     local skillbox_margin_right = 4
                     local skillbox_margin_bottom = 2
@@ -352,7 +351,7 @@ function Visuals()
                         fromBar = Math.XMFLOAT2(bottom2D.x + (width2D / 2) + skillbox_margin_right, top2D.y)
                         toBar = Math.XMFLOAT2(fromBar.x + skillbox_size, fromBar.y + skillbox_size)
                         if skill_1 >= 0 then
-                            Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_1, false), 0, 0)
+                            Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(string.format("%.1f", skill_1), false), 0, 0)
                             Game.Renderer:DrawText(string.format("%.1f", skill_1) .. "s", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                         else
                             --Game.Renderer:DrawText("Error", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
@@ -361,7 +360,7 @@ function Visuals()
                         fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
                         toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
                         if skill_2 >= 0 then
-                            Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_2, false), 0, 0)
+                            Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(string.format("%.1f", skill_2), false), 0, 0)
                             Game.Renderer:DrawText(string.format("%.1f", skill_2) .. "s", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                         else
                             --Game.Renderer:DrawText("Error", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
@@ -370,7 +369,7 @@ function Visuals()
                         fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
                         toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
                         if skill_3 >= 0 then
-                            Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(skill_3, false), 0, 0)
+                            Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(string.format("%.1f", skill_3), false), 0, 0)
                             Game.Renderer:DrawText(string.format("%.1f", skill_3) .. "s", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                         else
                             --Game.Renderer:DrawText("Error", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
