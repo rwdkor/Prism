@@ -69,7 +69,7 @@ end
 
 function GetSkillBoxColor(usable)
     --if usable == 0 then return 0xffff0000 end
-    if usable == 1 then return 0xff00ff00 end
+    if usable == 1 or usable == "100" then return 0xff00ff00 end
     return 0xffff0000
 end
 
@@ -118,6 +118,84 @@ function GetUltPercent(heroid, value)
     return 0
 end
 
+-- slot_id -> Slot Number
+-- Return -> 0: Cooldown, 1: Available
+function GetSkillCooldown(player, slot_id)
+    -- slot1, slot1type, slot2, slot2type, slot3, slot3type, slot4, slot4type,
+    -- slottype - 1: isusing, 2: isusable, 3: isblocked, 4: isusing+isusable
+    local skillCooldownTable = {
+        {0x02E000000000013B, 2, 2,  4, 2,  0, 2,  8, 2}, --Ana
+        {0x02E0000000000200, 2, 2,  4, 2,  0, 2,  8, 2}, --Ashe
+        {0x02E0000000000221, 2, 2,  4, 2,  0, 2,  8, 2}, --Baptiste
+        {0x02E0000000000015, 0, 2,  0, 2,  0, 2,  8, 2}, --Bastion
+        {0x02E0000000000195, 2, 2,  4, 2,  0, 2,  8, 2}, --Brigitte
+        {0x02E000000000012F, 2, 2,  0, 2,  7, 2,  8, 2}, --Doomfist
+        {0x02E000000000007A, 2, 2,  4, 2,  0, 2,  8, 2}, --D.Va
+        {0x02E0000000000206, 2, 2,  4, 2,  7, 2,  8, 2}, --Echo
+        {0x02E0000000000029, 2, 2,  4, 2,  0, 2,  8, 2}, --Gentji
+        {0x02E0000000000005, 2, 2,  4, 2,  0, 2,  8, 2}, --Hanzo
+        {0x02E0000000000065, 0, 2,  0, 2,  0, 2,  8, 2}, --Junkrat
+        {0x02E0000000000079, 0, 2,  4, 2,  7, 2,  8, 2}, --Lucio
+        {0x02E0000000000042, 2, 2,  4, 2,  0, 2,  8, 2}, --McCree
+        {0x02E00000000000DD, 2, 2,  4, 2,  0, 2,  8, 2}, --Mei
+        {0x02E0000000000004, 0, 2,  4, 2,  0, 2,  8, 2}, --Mercy
+        {0x02E00000000001A2, 2, 2,  4, 2,  0, 2,  8, 2}, --Moira
+        {0x02E000000000013E, 2, 2,  4, 2,  7, 2,  8, 2}, --Orisa
+        {0x02E0000000000008, 2, 2,  4, 2,  0, 2,  8, 2}, --Pharah
+        {0x02E0000000000002, 2, 2,  4, 2,  0, 2,  8, 2}, --Reaper
+        {0x02E0000000000007, 2, 2,  4, 2,  0, 2,  8, 2}, --Reinhardt
+        {0x02E0000000000040, 2, 2,  4, 2,  0, 2,  8, 2}, --Roadhog
+        {0x02E000000000023B, 2, 2,  4, 2,  0, 2,  8, 2}, --Sigma
+        {0x02E000000000006E, 0, 2,  4, 2,  7, 2,  8, 2}, --Soldier:76
+        {0x02E000000000012E, 2, 2,  4, 2,  0, 2,  8, 2}, --Sombra
+        {0x02E0000000000016, 2, 2,  4, 2,  0, 2,  8, 2}, --Symmetra
+        {0x02E0000000000006, 2, 2,  4, 2,  0, 2,  8, 2}, --Torbjorn
+        {0x02E0000000000003, 0, 2,  4, 2,  0, 2,  8, 2}, --Tracer
+        {0x02E000000000000A, 2, 2,  4, 2,  0, 2,  8, 2}, --Widowmaker
+        {0x02E0000000000009, 2, 2,  4, 2,  0, 2,  8, 2}, --Winston
+        {0x02E00000000001CA, 0, 2,  4, 2,  7, 2,  8, 2}, --Wrecking Ball
+        {0x02E0000000000068, 2, 4,  4, 4,  0, 2,  8, 2}, --Zarya
+        {0x02E0000000000020, 0, 2,  0, 2,  0, 2,  8, 2}  --Zenyatta
+    }
+
+    local heroid = player:GetIdentifier().HeroID
+
+    for i=1, #skillCooldownTable do
+        if heroid == skillCooldownTable[i][1] then
+            local slot_skill = skillCooldownTable[i][slotid * 2]
+            local slot_type = skillCooldownTable[i][slotid * 2 + 1]
+
+            if slot_skill ~= 0 then
+                local skill = player:GetSkill():GetSkillInfo(slot_skill, 0)
+                local skill_status
+                local skill_cooldown = 0
+
+                if slot_type == 1 then
+                    skill_status = skill.isUsing
+                    skill_cooldown = skill:GetCoolTime().x
+                elseif slot_type == 2 then
+                    skill_status = skill.isUsable
+                    skill_cooldown = skill:GetCoolTime().y
+                elseif slot_type == 3 then
+                    skill_status = skill.isBlocked
+                    skill_cooldown = 0
+                elseif slot_type == 4 then
+                    skill_status = skill.isUsing
+                    skill_cooldown = skill:GetCoolTime().x
+                    if skill_status ~= 1 then
+                        skill_status = skill.isUsable
+                        skill_cooldown = skill:GetCoolTime().y
+                    end
+                end
+            end
+
+            return skill_cooldown
+        end
+    end
+
+    return -1
+end
+
 function Visuals()
     local cnt = Game.Engine:GetPlayerCount()
     for i = 0, cnt-1 do
@@ -143,7 +221,7 @@ function Visuals()
                 end
 
                 local top3D = Mesh:GetBonePos(player:GetBoneId((1))) --head pos
-                top3D.y = top3D.y + 0.4
+                top3D.y = top3D.y + 0.2
                 local top2D = Math.XMFLOAT2(0, 0)
 
                 if not (Game.Engine:WorldToScreen(top3D, top2D)) then
@@ -161,7 +239,7 @@ function Visuals()
 
                 local pointLU = Math.XMFLOAT2(bottom2D.x - (width2D / 2), top2D.y)
 
-                if (player:IsEnemy()) then --player:IsEnemy()
+                if (true) then --player:IsEnemy()
                     
                     --[[ ESP ]]--
                     local box_width = 1;
@@ -181,7 +259,8 @@ function Visuals()
                     DrawBox(pointLU.x + box_width, pointLU.y + box_width, width2D - box_width * 2, height2D - box_width * 2, box_outline_width, 0xff000000)
                    
 
-                    --[[ Health ]]--
+
+                    --[[ Health ]]
                     local heightBar = height2D * (currenthealth / maxhealth)
                     local widthBar = 7
                     local leftBar = 4
@@ -205,18 +284,16 @@ function Visuals()
                         Game.Renderer:DrawBoxFilled(fromBar, toBar, 0xffff0000, 0, 0) --red
                     end
 
-
-                    --[[ Tracker ]]--
-                    heroid = player:GetIdentifier().HeroID
-                    --if not (heroid == 0x02E000000000016B or heroid == 0x02E000000000016C or heroid == 0x02E000000000016D or heroid == 0x02E000000000016E)
+                    --[[ Tracker ]]
                     local skill = player:GetSkill()
 
                     local skill_shift = skill:GetSkillInfo(2, 0).isUsable
                     local skill_e = skill:GetSkillInfo(4, 0).isUsable
                     local skill_ult = skill:GetSkillInfo(8, 0).isUsable
                     
-                    local skillbox_size = height2D / 8
-                    if skillbox_size > 13 then skillbox_size = 13 end
+                    local skillbox_size = height2D / 4
+                    if skillbox_size > 13 then skillbox_size = 13
+                    elseif skillbox_size < 7 then skillbox_size = 7 end
                     local skillbox_margin_right = 4
                     local skillbox_margin_bottom = 2
                     local caption_margin = 2
@@ -233,7 +310,8 @@ function Visuals()
 
                     fromBar.y = fromBar.y + skillbox_size + skillbox_margin_bottom
                     toBar.y = toBar.y + skillbox_size + skillbox_margin_bottom
-                    Game.Renderer:DrawText(GetUltPercent(heroid, skill_ult) .. "%", fromBar.x, fromBar.y, skillbox_size, 0xffffffff, false)
+                    Game.Renderer:DrawBoxFilled(fromBar, toBar, GetSkillBoxColor(GetUltPercent(heroid, skill_ult)), 0, 0)
+                    Game.Renderer:DrawText(GetUltPercent(heroid, skill_ult) .. "%", fromBar.x + skillbox_size + caption_margin, fromBar.y, skillbox_size, 0xffffffff, false)
                 end
             end
             do break end
