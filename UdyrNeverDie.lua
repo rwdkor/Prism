@@ -1,28 +1,3 @@
--- DownloadFile(FileURL, FullPathToDownload)
-local function DownloadFile(url, file)
-	DownloadFileAsync(url, file, function() end)
-	local timer = os.clock()
-	while os.clock() < timer + 1 do end
-	while not FileExist(file) do end
-end
-
--- ReadFile(FullPathToRead)
-local function ReadFile(file)
-	local txt = io.open(file, "r")
-	local result = txt:read()
-	txt:close(); return result
-end
-
-local Version, Version_Str = 1.00, "1.0.0"
-
-local function AutoUpdate()
-	DownloadFile("https://UdyrNeverDie.version", SCRIPT_PATH .. "UdyrNeverDie.version")
-	if tonumber(ReadFile(SCRIPT_PATH .. "JustEvade.version")) > Version then
-		print("UdyrNeverDie: Found update! Downloading...")
-		DownloadFile("https://UdyrNeverDie.lua", SCRIPT_PATH .. "UdyrNeverDie.lua")
-		print("UdyrNeverDie: Successfully updated. Press F1!")
-	end
-end
 
 -- HeroID(UInt64), UltMax(float), NPC(bool)
 local HeroDatabase = {
