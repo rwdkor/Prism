@@ -244,3 +244,7 @@ local SkillDatabase = {
         ["ZaryaBarrier"] = { slot = 0, type = 4, charging = false, casting = false, id = 0x2BB, extra_id = 0x5 },
     },
 }
+
+local InterruptableSkills = {
+    
+}
