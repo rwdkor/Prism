@@ -17,9 +17,9 @@ local Version, Version_Str = 1.00, "1.0.0"
 
 local function AutoUpdate()
 	DownloadFile("https://UdyrNeverDie.version", SCRIPT_PATH .. "UdyrNeverDie.version")
-	if tonumber(ReadFile(SCRIPT_PATH .. "JustEvade.version")) > Version then
+	if tonumber(ReadFile(SCRIPT_PATH .. "UdyrNeverDie.version")) > Version then
 		print("UdyrNeverDie: Found update! Downloading...")
-		DownloadFile("https://UdyrNeverDie.lua", SCRIPT_PATH .. "UdyrNeverDie.lua")
+		DownloadFile("https://github.com/rwdkor/Prism/raw/master/UdyrPack/UdyrNeverDie.lua", SCRIPT_PATH .. "UdyrNeverDie.lua")
 		print("UdyrNeverDie: Successfully updated. Press F1!")
 	end
 end

@@ -1,5 +1,6 @@
-local OnDraw_Init_First = true
+local Global_Fov = 20.0
 local tmBasedSmth = 0.0
+local First_Init = true
 
 --[[
     Prism Wrapper / Util
@@ -32,13 +33,6 @@ end
 function DrawShadowBox(PointX, PointY, Width, Height, LineColor, OutlineColor, LineThickness, OutlineThickness)
     DrawBox(PointX - LineThickness, PointY - LineThickness, Width + LineThickness * 2, Height + LineThickness * 2, OutlineColor, OutlineThickness) --Outline
     DrawBox(PointX, PointY, Width, Height, LineColor, LineThickness) --Line
-end
-
-function DrawFilledBox(PointX, PointY, Width, Height, Color, Thickness)
-    local Point1 = Math.XMFLOAT2(PointX, PointY)
-    local Point4 = Math.XMFLOAT2(PointX + Width, PointY + Height)
-    
-    Game.Renderer:DrawBoxFilled(Point1, Point4, Color, Thickness, -1)
 end
 
 function abs(v)
@@ -134,8 +128,8 @@ local SkillDatabase = {
     },
     ["Brigitte"] = { 
         ["BrigitteShift"] = { Resource, slot = 1, type = 5, charging = false, casting = false, id = 0x3D, extra_id = 0x6 },
-        --["BrigitteE"] = { Resource, slot = 2, type = 5, charging = false, casting = false, id = 0x3D, extra_id = 0x7 },
-        --["BrigitteR"] = { Resource, slot = 4, type = 5, charging = false, casting = false, id = 0x3D, extra_id = 0x3306 },
+        ["BrigitteE"] = { Resource, slot = 2, type = 4, charging = false, casting = false, id = 0x3D, extra_id = 0x7 },
+        ["BrigitteR"] = { Resource, slot = 4, type = 4, charging = false, casting = false, id = 0x3D, extra_id = 0x3306 },
         ["BrigitteUlt"] = { Resource, slot = 5, type = 2, charging = false, casting = false, id = 0, extra_id = 0 },
     },
     ["Doomfist"] = { 
@@ -292,301 +286,464 @@ function GetUltPercent(HeroName, UltCurrent)
     return 100
 end
 
--- Return -> x: Max / y: Current
-function GetSkillCooldown(Player, Skill)
-    -- [slot] 0: Passive, 1: SKILL_1(Shift), 2: SKILL_2(E), 3: SKILL_L, 4: SKILL_R, 5: SKILL_ULT
-    -- [type] 1: .isUsing, 2: .flUltGauge, 3: .isBlocked, 4: GetCoolTime(), 5: .isUsing+GetCoolTime()
-    
-    local Skill_Cooldown = { x, y }
-    local Skill_Status = -1
-
-    --Skill_Cooldown.y = 3.5
-    
-    local Skill_NormalInfo = Player:GetSkill():GetSkillInfo(Skill.slot, 0)
-    local Skill_CoolInfo = Player:GetSkill():GetSkillInfo(Skill.id, Skill.extra_id)
-
-    if Skill.type == 1 then
-        Skill_Status = Skill_NormalInfo.isUsing
-        if Skill_Status == 1 then Skill_Cooldown = Skill_CoolInfo:GetCoolTime().x
-        else Skill_Cooldown.y = Skill_CoolInfo:GetCoolTime().y end
-    elseif Skill.type == 2 then
-        Skill_Cooldown.y = Skill_NormalInfo.flUltGauge
-    elseif Skill.type == 3 then
-        Skill_Cooldown.x = 1
-        Skill_Cooldown.y = Skill_NormalInfo.isBlocked
-    elseif Skill.type == 4 then
-        Skill_Cooldown.y = Skill_CoolInfo:GetCoolTime().y
-        Skill_Cooldown.x = Skill_CoolInfo:GetCoolTime().x
-    elseif Skill.type == 5 then
-        Skill_Status = Skill_NormalInfo.isUsing
-        if Skill_Status == 1 then
-            if Skill.slot ~= 5 then
-                Skill_Cooldown.x = Skill_CoolInfo:GetCoolTime().x
-                Skill_Cooldown.y = Skill_CoolInfo:GetCoolTime().x
-            else
-                Skill_Cooldown.x = 0
-                Skill_Cooldown.y = 0
-            end
-        else
-            if Skill.slot ~= 5 then
-                Skill_Cooldown.x = Skill_CoolInfo:GetCoolTime().x
-                Skill_Cooldown.y = Skill_CoolInfo:GetCoolTime().y
-            else
-                Skill_Cooldown.x = 0
-                Skill_Cooldown.y = Skill_NormalInfo.flUltGauge
-            end
-        end
-    end
-    
-    return Skill_Cooldown
+function CalcAngle(Position1, Position2)
+    return Math.NormalizeVec3(Position1 - Position2)
 end
 
+function CalcAngleFromLocalPosition(Position)
+    local LocalPos = Game.Engine:GetViewMatrix():GetCameraVec()
+    return Math.NormalizeVec3(Position - LocalPos)
+end
+
+function CalcFov(Angle1, Angle2)
+    return dst(Angle1, Angle2)
+end
+
+function CalcFovFromLocalAngle(Angle)
+    local Control = Game.Engine:GetController()
+    return dst(Control:GetAngle(), Angle)
+end
 
 --[[
-    Visual Class
+    Genji
 --]]
-local Visual = { 
-    --[[ BoxESP ]]
-    Box_Visible_Color = 0xFF00FF00, --Green
-    Box_Hidden_Color = 0xFFFF0000, --Red
-    Box_Outline_Color = 0xFF000000, --Black
-    Box_Line_Thickness = 2,
-    Box_Outline_Thickness = 1,
-    Box_Filled_Color = 0x30444444, --Black
+local Genji = { BestTarget = nil, BestFov, BestBone,
+                MeleeAimbot = false, MeleeTarget = nil, MeleeAimbotSpeed = 0.025,
+                DashAimbot = false, DashTarget = nil, DashAimbotSpeed = 0.025, DashBestBone = 777 }
 
-    --[[ Health ]]
-    Health_Back_Color = 0xFF000000, --Black
-    Health_Margin_Right = 3,
-    Health_Main_Thickness = 6,
-    Health_Back_Thickness = 8,
-
-    --[[ Awareness ]]
-    Awareness_Icon_Size = 36,
-    Awareness_Icon_Margin = 7
-}
-
-function Visual:DrawESP(Player, Box_Type)
-    local Mesh = Player:GetMesh()
-
-    if not (Mesh) then return nil end
-    if not (Player:GetIdentifier()) then return nil end
-
-    local Bottom3D = Mesh:GetLocation()
-    local Bottom2D = Math.XMFLOAT2(0, 0)
-
-    if not (W2S(Bottom3D, Bottom2D)) then return nil end
-
-    local Top3D = Mesh:GetBonePos(Player:GetBoneId((1))) --머리
-    Top3D.y = Top3D.y + 0.25
-    local Top2D = Math.XMFLOAT2(0, 0)
-
-    if not (W2S(Top3D, Top2D)) then return nil end
-
-    local Left3D = Mesh:GetBonePos(Player:GetBoneId((6))) --왼쪽 어깨
-    local Right3D = Mesh:GetBonePos(Player:GetBoneId((9))) --오른쪽 어깨
-
-    local Height3D = abs(Top3D.y - Bottom3D.y)
-    local Height2D = abs(Top2D.y - Bottom2D.y)
-
-    local Width3D = ((Left3D.x - Right3D.x)^2 + (Left3D.z - Right3D.z)^2)^0.5 * 2
-    local Width2D = (Height2D * (Width3D / Height3D))
-    
-    local Box_Color = self.Box_Hidden_Color
-    if Player:GetVisibility():IsVisible() then Box_Color = self.Box_Visible_Color end
-
-    local PointLU = Math.XMFLOAT2(Bottom2D.x - (Width2D / 2), Top2D.y)
-    local PointLD = Math.XMFLOAT2(Bottom2D.x - (Width2D / 2), Bottom2D.y)
-    local PointRD = Math.XMFLOAT2(Bottom2D.x + (Width2D / 2), Bottom2D.y)
-
-    if (Box_Type == 0) then --Default Box
-        DrawShadowBox(PointLU.x, PointLU.y, Width2D, Height2D, Box_Color, self.Box_Outline_Color, self.Box_Line_Thickness, self.Box_Outline_Thickness)
-    elseif (Box_Type == 1) then --Semi Box
-        DrawShadowLine(PointLU, PointLD, Box_Color, self.Box_Outline_Color, self.Box_Line_Thickness, self.Box_Outline_Thickness)
-        DrawShadowLine(PointLD, PointRD, Box_Color, self.Box_Outline_Color, self.Box_Line_Thickness, self.Box_Outline_Thickness)
-    elseif (Box_Type == 2) then --Filled Box
-        DrawShadowBox(PointLU.x, PointLU.y, Width2D, Height2D, Box_Color, self.Box_Outline_Color, self.Box_Line_Thickness, self.Box_Outline_Thickness)
-        DrawFilledBox(PointLU.x, PointLU.y, Width2D, Height2D, self.Box_Filled_Color, self.Box_Line_Thickness)
-    end
-end
-
-function Visual:DrawHealth(Player, HealthCurrent, HealthMax)
-    local Mesh = Player:GetMesh()
-
-    if not (Mesh) then return nil end
-    if not (Player:GetIdentifier()) then return nil end
-
-    local Bottom3D = Mesh:GetLocation()
-    local Bottom2D = Math.XMFLOAT2(0, 0)
-
-    if not (W2S(Bottom3D, Bottom2D)) then return nil end
-
-    local Top3D = Mesh:GetBonePos(Player:GetBoneId((1))) --머리
-    Top3D.y = Top3D.y + 0.25
-    local Top2D = Math.XMFLOAT2(0, 0)
-
-    if not (W2S(Top3D, Top2D)) then return nil end
-
-    local Left3D = Mesh:GetBonePos(Player:GetBoneId((6))) --왼쪽 어깨
-    local Right3D = Mesh:GetBonePos(Player:GetBoneId((9))) --오른쪽 어깨
-
-    local Height3D = abs(Top3D.y - Bottom3D.y)
-    local Height2D = abs(Top2D.y - Bottom2D.y)
-
-    local Width3D = ((Left3D.x - Right3D.x)^2 + (Left3D.z - Right3D.z)^2)^0.5 * 2
-    local Width2D = (Height2D * (Width3D / Height3D))
-    
-    local Box_Color = 0xFF01710F --Error
-
-    if (HealthCurrent > 120) then Box_Color = 0xFF00FF00 --Green
-    elseif (HealthCurrent > 60) then Box_Color = 0xFFFFFF00 --Yellow
-    else Box_Color = 0xFFFF0000 end --Red
-
-    local PointLU = Math.XMFLOAT2(Bottom2D.x - (Width2D / 2), Top2D.y)
-
-    local Health_Main_Height = Height2D * (HealthCurrent / HealthMax)
-    local Thickness_Diff = self.Health_Back_Thickness - self.Health_Main_Thickness
-    local From2D = Math.XMFLOAT2(PointLU.x - self.Health_Margin_Right - self.Health_Back_Thickness, PointLU.y - Thickness_Diff / 2)
-    local To2D = Math.XMFLOAT2(PointLU.x - self.Health_Margin_Right, PointLU.y + Thickness_Diff / 2 + Height2D)
-    
-    Game.Renderer:DrawBoxFilled(From2D, To2D, 0xFF000000, 0, 0)
-    --Game.Renderer:DrawText(HealthCurrent, From2D.x, From2D.y - 30, 20, 0xFFFFFFFF, false)
-    From2D.x = From2D.x + round(Thickness_Diff / 2)
-    From2D.y = To2D.y - Health_Main_Height
-    To2D.x = To2D.x - round(Thickness_Diff / 2)
-    To2D.y = To2D.y - round(Thickness_Diff / 2)
-
-    Game.Renderer:DrawBoxFilled(From2D, To2D, Box_Color, 0, 0)
-end
-
-function Visual:Awareness()
+--[[
+    Genji:TargetSelector
+    Mode - 0: Closest, 1: LowestHP, 2: Priority, 3: ClosestAim, 4: Smart
+--]]
+function Genji:TargetSelector(Mode)
+    local LocalPlayer = Game.Engine:GetLocalPlayer()
     local Count = Game.Engine:GetPlayerCount()
-    local EnemyCount = 0
 
-    for i = 0, Count - 1 do
-        if (Game.Engine:GetPlayerAt(i):IsEnemy() and
-            Game.Engine:GetPlayerAt(i):GetIdentifier() and
-            Game.Engine:GetPlayerAt(i):GetMesh()) then
-            EnemyCount = EnemyCount + 1
-        end
-    end
-
-    local ScreenHeight = Game.Renderer:GetHeight()
-    self.Awareness_Icon_Size = ScreenHeight / 40
-    self.Awareness_Icon_Margin = self.Awareness_Icon_Size / 5
-    local BoxWidth = (self.Awareness_Icon_Size + self.Awareness_Icon_Margin) * 6 + self.Awareness_Icon_Margin
-    local BoxHeight = EnemyCount * (self.Awareness_Icon_Size + self.Awareness_Icon_Margin) + self.Awareness_Icon_Margin
-    local FontSize = self.Awareness_Icon_Size * 0.6
-    
-    local BoxFrom2D = Math.XMFLOAT2(0, tonumber(round(ScreenHeight / 2 - BoxHeight * 0.8) - 30))
-    local BoxTo2D = Math.XMFLOAT2(BoxWidth, tonumber(round(ScreenHeight / 2 + BoxHeight * 0.2)))
-
-    Game.Renderer:DrawBoxFilled(BoxFrom2D, BoxTo2D, 0x9A0000000, 0, 0)
-    Game.Renderer:DrawText("UdyrAwareness", BoxFrom2D.x + BoxWidth / 2, BoxFrom2D.y + self.Awareness_Icon_Margin, FontSize, 0xFFFAFF60, true)
-
-    BoxFrom2D.y = BoxFrom2D.y + 30
-
-    EnemyCount = 0
+    Genji.BestTarget = nil
+    Genji.BestFov = Game.Engine:GetFov()
+    Genji.BestBone = -1
 
     for i = 0, Count - 1 do
         local Player = Game.Engine:GetPlayerAt(i)
-        if not (Player:IsEnemy()) then goto Continue end
-        if not (Player:GetIdentifier()) then return nil end
-        local HeroName = Player:GetIdentifier():GetHeroName()
-        if (HeroName == nil) or (Heroname == "") then return nil end
-        Game.Renderer:DrawResource(BoxFrom2D.x + self.Awareness_Icon_Margin, BoxFrom2D.y + self.Awareness_Icon_Margin + EnemyCount * (self.Awareness_Icon_Margin + self.Awareness_Icon_Size), self.Awareness_Icon_Size, self.Awareness_Icon_Size, HeroDatabase[HeroName].Resource)
-        local XM2From = Math.XMFLOAT2(BoxFrom2D.x + self.Awareness_Icon_Margin, BoxFrom2D.y + self.Awareness_Icon_Margin + EnemyCount * (self.Awareness_Icon_Margin + self.Awareness_Icon_Size))
-        local XM2To = Math.XMFLOAT2(XM2From.x + self.Awareness_Icon_Size, XM2From.y + self.Awareness_Icon_Size)
         local Health = Player:GetHealth()
         local HealthCurrent = Health:GetLife().y
-        if (Health and (HealthCurrent == 0)) then Game.Renderer:DrawBoxFilled(XM2From, XM2To, 0xA0C80000, 0, 0) end
+        local HealthMax = Health:GetLife().x
 
-        for Key in pairs(SkillDatabase[HeroName]) do
-            --local Resource_SkillIcon = Game.Renderer:LoadResource("UdyrPack\\Images\\Icons\\Skills\\" .. Key .. ".png")
-            Game.Renderer:DrawResource(BoxFrom2D.x + self.Awareness_Icon_Margin + (SkillDatabase[HeroName][Key].slot) * (self.Awareness_Icon_Size + self.Awareness_Icon_Margin), BoxFrom2D.y + self.Awareness_Icon_Margin + EnemyCount * (self.Awareness_Icon_Margin + self.Awareness_Icon_Size), self.Awareness_Icon_Size, self.Awareness_Icon_Size, SkillDatabase[HeroName][Key].Resource)
-            local Cooldown = GetSkillCooldown(Player, SkillDatabase[HeroName][Key])
-            --Game.Renderer:DrawText(Cooldown.y, 100 + (SkillDatabase[HeroName][Key].slot - 1) * 250, 100 + i * 30, 24, 0xff000000, false)
-            local IconHeight = 0
-            local ModifiedBoxFrom2D = Math.XMFLOAT2(0, 0)
-            local ModifiedBoxTo2D = Math.XMFLOAT2(0, 0)
+        --check Alive
+        if (Health and (HealthCurrent > 0) and Player:IsEnemy()) then
+            if not (Player:GetVisibility():IsVisible()) then goto Continue end
+            if not (Player:GetIdentifier()) then goto Continue end
 
-            if (Cooldown.y > 0.2) and (SkillDatabase[HeroName][Key].slot ~= 5) then
-                IconHeight = self.Awareness_Icon_Size * (Cooldown.y / Cooldown.x)
-                ModifiedBoxFrom2D = Math.XMFLOAT2(BoxFrom2D.x + self.Awareness_Icon_Margin + (SkillDatabase[HeroName][Key].slot) * (self.Awareness_Icon_Size + self.Awareness_Icon_Margin), BoxFrom2D.y + self.Awareness_Icon_Size - IconHeight + self.Awareness_Icon_Margin + EnemyCount * (self.Awareness_Icon_Margin + self.Awareness_Icon_Size))
-                ModifiedBoxTo2D = Math.XMFLOAT2(ModifiedBoxFrom2D.x + self.Awareness_Icon_Size, ModifiedBoxFrom2D.y + IconHeight)
-                Game.Renderer:DrawBoxFilled(ModifiedBoxFrom2D, ModifiedBoxTo2D, 0xA0EE8030, 0, 0)
-                ModifiedBoxFrom2D.x = ModifiedBoxFrom2D.x + self.Awareness_Icon_Size / 2
-                ModifiedBoxFrom2D.y = ModifiedBoxFrom2D.y + IconHeight - self.Awareness_Icon_Size + 6
-                Game.Renderer:DrawText(round(Cooldown.y), ModifiedBoxFrom2D.x, ModifiedBoxFrom2D.y, FontSize + 3, 0xFF333333, true)
-                ModifiedBoxFrom2D.y = ModifiedBoxFrom2D.y + 1
-                Game.Renderer:DrawText(round(Cooldown.y), ModifiedBoxFrom2D.x, ModifiedBoxFrom2D.y, FontSize, 0xFFFFA0FF, true)
-            elseif (SkillDatabase[HeroName][Key].slot == 5) and (GetUltPercent(HeroName, Cooldown.y) ~= "100") then
-                local UltPercent = GetUltPercent(HeroName, Cooldown.y)
-                IconHeight = self.Awareness_Icon_Size * (1 - UltPercent / 100)
-                ModifiedBoxFrom2D = Math.XMFLOAT2(BoxFrom2D.x + self.Awareness_Icon_Margin + (SkillDatabase[HeroName][Key].slot) * (self.Awareness_Icon_Size + self.Awareness_Icon_Margin), BoxFrom2D.y + self.Awareness_Icon_Size - IconHeight + self.Awareness_Icon_Margin + EnemyCount * (self.Awareness_Icon_Margin + self.Awareness_Icon_Size))
-                ModifiedBoxTo2D = Math.XMFLOAT2(ModifiedBoxFrom2D.x + self.Awareness_Icon_Size, ModifiedBoxFrom2D.y + IconHeight)
-                Game.Renderer:DrawBoxFilled(ModifiedBoxFrom2D, ModifiedBoxTo2D, 0xA0EE8030, 0, 0)
-                ModifiedBoxFrom2D.x = ModifiedBoxFrom2D.x + self.Awareness_Icon_Size / 2
-                ModifiedBoxFrom2D.y = ModifiedBoxFrom2D.y + IconHeight - self.Awareness_Icon_Size + 6
-                Game.Renderer:DrawText(UltPercent, ModifiedBoxFrom2D.x, ModifiedBoxFrom2D.y, FontSize + 3, 0xFF000000, true)
-                ModifiedBoxFrom2D.y = ModifiedBoxFrom2D.y + 1
-                Game.Renderer:DrawText(UltPercent, ModifiedBoxFrom2D.x, ModifiedBoxFrom2D.y, FontSize, 0xFFFF80FF, true)
+            if (Genji.BestTarget == nil) then
+                local Found = Game.Engine:FindBestBone(Player, Genji.BestFov, 0x11, 1)
+
+                if (Found.bFound) then
+                    Genji.BestTarget = Player
+                    Genji.BestFov = Found.lastFov
+                    Genji.BestBone = Found.foundBone
+                end
+                goto Continue
+            end
+
+            if (Mode == 0) then --Closest
+                if (dst(LocalPlayer:GetMesh():GetLocation(), Genji.BestTarget:GetMesh():GetLocation()) >=
+                    dst(LocalPlayer:GetMesh():GetLocation(), Player:GetMesh():GetLocation())) then
+                    Genji.BestTarget = Player
+                end
+            elseif (Mode == 1) then --LowestHP
+                if (Genji.BestTarget:GetHealth():GetLife().y >= HealthCurrent) then
+                    Genji.BestTarget = Player
+                end
+            elseif (Mode == 2) then --Priority
+                --to-do
+            elseif (Mode == 3) then --ClosestAim
+                local LocalPos = Game.Engine:GetViewMatrix():GetCameraVec()
+                local Control = Game.Engine:GetController()
+                if (CalcFovFromLocalAngle(CalcAngleFromLocalPosition(Genji.BestTarget:GetMesh():GetBonePos(Genji.BestTarget:GetBoneId(1)))) >=
+                    CalcFovFromLocalAngle(CalcAngleFromLocalPosition(Player:GetMesh():GetBonePos(Player:GetBoneId(1))))) then
+                    local Found = Game.Engine:FindBestBone(Player, Genji.BestFov, 0x11, 1)
+
+                    if (Found.bFound) then
+                        Genji.BestTarget = Player
+                        Genji.BestFov = Found.lastFov
+                        Genji.BestBone = Found.foundBone
+                    end
+                end
+            elseif (Mode == 4) then --Smart
+                local _Friends = Genji:NearFriends(Genji.BestTarget, true)
+                local Friends = Genji:NearFriends(Player, true)
+                local _Distance = dst(LocalPlayer:GetMesh():GetLocation(), Genji.BestTarget:GetMesh():GetLocation())
+                local Distance = dst(LocalPlayer:GetMesh():GetLocation(), Player:GetMesh():GetLocation())
+                local _HealthCurrent = Genji.BestTarget:GetHealth():GetLife().y
+
+                local _Score = Genji:CalcTargetScore(_Friends, _Distance, _HealthCurrent)
+                local Score = Genji:CalcTargetScore(Friends, Distance, HealthCurrent)
+
+                if (_Score >= Score) then
+                    Genji.BestTarget = Player
+                end
             end
         end
-        --Game.Renderer:DrawText(SkillCount, 200, 200 + i * 30, 24, 0xFFFF0000, false)
-
-        EnemyCount = EnemyCount + 1
-        --
         ::Continue::
+    end
+end
+
+--[[
+    Genji:CalcTargetScore
+--]]
+function Genji:CalcTargetScore(Friends, Distance, HealthCurrent)
+    return Friends + Distance / 10 + HealthCurrent / 100
+end
+
+--[[
+    Genji:NearFriends
+    Enemy - True: Enemy, False: Team
+--]]
+function Genji:NearFriends(_Player, Enemy)
+    local Count = Game.Engine:GetPlayerCount()
+    local NearAllyHeroes = 0
+
+    for i = 0, Count - 1 do
+        local Player = Game.Engine:GetPlayerAt(i)
+        local Health = Player:GetHealth()
+        local HealthCurrent = Health:GetLife().y
+        local HealthMax = Health:GetLife().x
+
+        --check Alive
+        if (Health and (HealthCurrent > 0) and (Player:IsEnemy() == Enemy)) then
+            if (_Player == Player) then goto Continue end
+
+            local Distance = dst(Player:GetMesh():GetLocation(), _Player:GetMesh():GetLocation())
+
+            if (Distance > 10.0) then goto Continue end
+
+            NearAllyHeroes = NearAllyHeroes + 1
+            ::Continue::
+        end
+    end
+
+    return NearAllyHeroes
+end
+
+--[[
+    Genji:UsingDragonblade
+--]]
+function Genji:UsingDragonblade()
+    return Game.Engine:GetLocalPlayer():GetSkill():GetSkillInfo(0x1510, 0).isUsing
+end
+
+function Genji:DragonbladeRemainingTime()
+    return Game.Engine:GetLocalPlayer():GetSkill():GetSkillInfo(0xD7, 5):GetCoolTime().y
+end
+
+function Genji:NanoBoosted()
+	return Game.Engine:GetLocalPlayer():GetSkill():GetSkillInfo(0x34A, 0).isUsing
+end
+
+--[[
+    Genji:Aimbot
+--]]
+function Genji:Aimbot( Speed, Fov_Free )
+	if (Genji.DashAimbot) then
+        local Mesh = Genji.DashTarget:GetMesh()
+            if (Mesh) then
+                local locPos = Game.Engine:GetViewMatrix():GetCameraVec()
+				local bonePos
+				if Genji.DashBestBone == 777 then
+					bonePos = Mesh:GetLocation()
+				else
+					bonePos = Mesh:GetBonePos(Genji.DashBestBone)
+				end
+
+                local PredictPos = Math.Predict(locPos, bonePos, Mesh:GetVelocity(), 50, 0)
+
+                local Diff = Math.XMFLOAT3(PredictPos.x - bonePos.x, PredictPos.y - bonePos.y, PredictPos.z - bonePos.z)
+
+                PredictPos.y = bonePos.y + Diff.y - 0.15
+                
+                local AimSpeed = Genji.DashAimbotSpeed
+                local Control = Game.Engine:GetController()
+                local AngleDiff = CalcFovFromLocalAngle(CalcAngleFromLocalPosition(PredictPos))
+
+                if (AngleDiff >= 0.35) then AimSpeed = AngleDiff * 0.01 + AimSpeed end
+
+                local dstAngle = Math.LerpVec3(Control:GetAngle(), CalcAngleFromLocalPosition(PredictPos), AimSpeed)
+                Control:SetAngle(dstAngle)
+            end
+	elseif (Genji.MeleeAimbot) then
+        local Mesh = Genji.MeleeTarget:GetMesh()
+            if (Mesh) then
+                local locPos = Game.Engine:GetViewMatrix():GetCameraVec()
+                local bonePos = Mesh:GetBonePos(0x11)
+
+                local PredictPos = Math.Predict(locPos, bonePos, Mesh:GetVelocity(), 50, 0)
+
+                local Diff = Math.XMFLOAT3(PredictPos.x - bonePos.x, PredictPos.y - bonePos.y, PredictPos.z - bonePos.z)
+
+                PredictPos.y = bonePos.y + Diff.y - 0.35
+                
+                local AimSpeed = Genji.MeleeAimbotSpeed
+                local Control = Game.Engine:GetController()
+                local AngleDiff = CalcFovFromLocalAngle(CalcAngleFromLocalPosition(PredictPos))
+
+                if (Genji.UsingDragonblade() == 0) then
+                    if (AngleDiff >= 0.35) then AimSpeed = AngleDiff * 0.01 + AimSpeed end
+                else
+                    if (AngleDiff >= 0.15) then AimSpeed = (AngleDiff * 0.01 + AimSpeed) * 0.5 end
+                end
+
+                local dstAngle = Math.LerpVec3(Control:GetAngle(), CalcAngleFromLocalPosition(PredictPos), AimSpeed)
+                Control:SetAngle(dstAngle)
+            end
+    elseif (Game.Utils.IsKeyPressed(0x4)) then --VK_MBUTTON
+        if (Genji.BestBone ~= -1) then
+            local Mesh = Genji.BestTarget:GetMesh()
+            if (Mesh) then
+                local locPos = Game.Engine:GetViewMatrix():GetCameraVec()
+                local bonePos = Mesh:GetBonePos(Genji.BestBone)
+
+                local PredictPos
+                if (Genji.UsingDragonblade() == 0) then
+	                PredictPos = Math.Predict(locPos, bonePos, Mesh:GetVelocity(), 60, 0)
+                end
+
+                local Diff = Math.XMFLOAT3(PredictPos.x - bonePos.x, PredictPos.y - bonePos.y, PredictPos.z - bonePos.z)
+                local HeightMultiply = 0.4
+
+                if Diff.y < 1.5 and Diff.y > -0.3 then HeightMultiply = 0.2 + abs(Diff.y * 0.2)
+                elseif Diff.y < -0.3 and Diff.y > -1.4 then HeightMultiply = abs(Diff.y * 1.88) end
+
+                PredictPos.x = bonePos.x + Diff.x * 1.2
+                PredictPos.y = bonePos.y + Diff.y * HeightMultiply - 0.3
+                PredictPos.z = bonePos.z + Diff.z * 1.2
+                
+                local AimSpeed = Speed
+                local Control = Game.Engine:GetController()
+                local AngleDiff = dst(Control:GetAngle(), Math.NormalizeVec3(bonePos - locPos))
+                
+                if (AngleDiff < Fov_Free + 0.12) and (AngleDiff >= Fov_Free) then AimSpeed = Fov_Free / 10 / AngleDiff end
+
+                local dstAngle = Math.LerpVec3(Control:GetAngle(), Math.NormalizeVec3(PredictPos - locPos), AimSpeed)
+                Control:SetAngle(dstAngle)
+            end
+        end
+    end
+end
+
+--[[
+    Genji:AutoMelee
+--]]
+function Genji:AutoMelee()
+    local Count = Game.Engine:GetPlayerCount()
+    local LocalPlayer = Game.Engine:GetLocalPlayer()
+
+    for i = 0, Count - 1 do
+        local Player = Game.Engine:GetPlayerAt(i)
+        local Health = Player:GetHealth()
+        local HealthCurrent = Health:GetLife().y
+		local HealthMax = Health:GetLife().x
+		if (Genji:NanoBoosted()) then HealthCurrent = HealthCurrent * 0.75 end
+        Genji.MeleeAimbot = false
+
+        --check Alive
+        if (Health and (HealthCurrent > 0) and Player:IsEnemy()) then
+			if not (Player:GetVisibility():IsVisible()) then goto Continue end
+            if not (Player:GetIdentifier()) then goto Continue end
+
+            local Distance = dst(Player:GetMesh():GetLocation(), LocalPlayer:GetMesh():GetLocation())
+            if (Genji.UsingDragonblade() == 0) then
+                if (Distance > 2.86) then goto Continue end
+
+                local Fov_Enemy_Local = CalcFovFromLocalAngle(CalcAngleFromLocalPosition(Player:GetMesh():GetBonePos(0x11)))
+
+                if (HealthCurrent > 30) then goto Continue end
+
+                if (Fov_Enemy_Local > (0.6^Distance)*1.5) then
+                    Genji.MeleeAimbot = true
+					Genji.MeleeTarget = Player
+					Genji.MeleeAimbotSpeed = 0.025
+                    return
+				else
+					Genji.MeleeAimbot = true
+					Genji.MeleeTarget = Player
+					Genji.MeleeAimbotSpeed = 0.002
+                    Game.Engine:GetController():SetKeyCode(0x800)
+                    return
+                end
+            else
+                if (Distance > 5.3) then goto Continue end
+
+                if (Genji:DragonbladeRemainingTime() < 0.3) then goto Continue end
+
+                local Fov_Enemy_Local = CalcFovFromLocalAngle(CalcAngleFromLocalPosition(Player:GetMesh():GetBonePos(0x11)))
+           
+                if (Fov_Enemy_Local > (0.9^Distance)*1.19) then
+                    Genji.MeleeAimbot = true
+					Genji.MeleeTarget = Player
+					Genji.MeleeAimbotSpeed = 0.05
+                    return
+                else
+					Genji.MeleeAimbot = true
+					Genji.MeleeTarget = Player
+					Genji.MeleeAimbotSpeed = 0.004
+                    Game.Engine:GetController():SetKeyCode(0x1)
+                    return
+                end
+                
+            end
+            ::Continue::
+        end
+    end
+end
+
+--[[
+    Genji:AutoDash
+--]]
+function Genji:AutoDash()
+    local Count = Game.Engine:GetPlayerCount()
+    local LocalPlayer = Game.Engine:GetLocalPlayer()
+
+    for i = 0, Count - 1 do
+        local Player = Game.Engine:GetPlayerAt(i)
+        local Health = Player:GetHealth()
+        local HealthCurrent = Health:GetLife().y
+		local HealthMax = Health:GetLife().x
+		if (Genji:NanoBoosted()) then HealthCurrent = HealthCurrent * 0.75 end
+        Genji.DashAimbot = false
+
+        --check Alive
+        if (Health and (HealthCurrent > 0) and Player:IsEnemy()) then
+			if not (Player:GetVisibility():IsVisible()) then goto Continue end
+			if not (Player:GetIdentifier()) then goto Continue end
+			
+			if ((Game.Engine:GetLocalPlayer():GetSkill():GetSkillInfo(0x3D, 0x6):GetCoolTime().x ~= 0.0) and
+				(Game.Engine:GetLocalPlayer():GetSkill():GetSkillInfo(0x3D, 0x6):GetCoolTime().y > 0.3)) then goto Continue end
+
+			local Distance = dst(Player:GetMesh():GetLocation(), LocalPlayer:GetMesh():GetLocation())
+			if (Genji.UsingDragonblade() == 0) then
+				if (Distance > 15) then goto Continue end
+
+				local BestBone = 777
+
+				if not Game.Engine:RayCast(Game.Engine:GetViewMatrix():GetCameraVec(), Player:GetMesh():GetLocation(), 3).hittedPlayer:IsValid() then
+					local Found = Game.Engine:FindBestBone(Player, Game.Engine:GetFov(), Player:GetBoneId(0x5), 3)
+					if (Found.bFound) then
+						BestBone = Found.foundBone
+					end
+				end
+
+				local Fov_Enemy_Local
+				
+				if BestBone == 777 then
+					Fov_Enemy_Local = CalcFovFromLocalAngle(CalcAngleFromLocalPosition(Player:GetMesh():GetLocation()))
+				else
+					Fov_Enemy_Local = CalcFovFromLocalAngle(CalcAngleFromLocalPosition(Player:GetMesh():GetBonePos(BestBone)))
+				end
+
+				if (HealthCurrent > 50) then goto Continue end
+
+				if (Fov_Enemy_Local > (0.77^Distance)*1.3) then
+					Genji.DashAimbot = true
+					Genji.DashTarget = Player
+					Genji.DashBestBone = BestBone
+					Genji.DashAimbotSpeed = 0.03
+					return
+				else
+					Game.Engine:GetController():SetKeyCode(0x8)
+					return
+				end
+			else
+				if (Distance > 15) then goto Continue end
+
+				local BestBone = 777
+
+				if not Game.Engine:RayCast(Game.Engine:GetViewMatrix():GetCameraVec(), Player:GetMesh():GetLocation(), 3).hittedPlayer:IsValid() then
+					local Found = Game.Engine:FindBestBone(Player, Game.Engine:GetFov(), Player:GetBoneId(0x5), 3)
+					if (Found.bFound) then
+						BestBone = Found.foundBone
+					end
+				end
+
+				local Fov_Enemy_Local
+				
+				if BestBone == 777 then
+					Fov_Enemy_Local = CalcFovFromLocalAngle(CalcAngleFromLocalPosition(Player:GetMesh():GetLocation()))
+				else
+					Fov_Enemy_Local = CalcFovFromLocalAngle(CalcAngleFromLocalPosition(Player:GetMesh():GetBonePos(BestBone)))
+				end
+				
+				if (HealthCurrent > 170) then goto Continue end
+
+				if (Fov_Enemy_Local > (0.77^Distance)*1.2) then
+					Genji.DashAimbot = true
+					Genji.DashTarget = Player
+					Genji.DashBestBone = BestBone
+					Genji.DashAimbotSpeed = 0.03
+					return
+				else
+					Genji.DashAimbot = true
+					Genji.DashTarget = Player
+					Genji.DashBestBone = BestBone
+					Genji.DashAimbotSpeed = 0.005
+					Game.Engine:GetController():SetKeyCode(0x8)
+					return
+				end
+			end
+			::Continue::
+        end
     end
 end
 
 
 --[[
-    Evade
+    Genji:OnUpdate
 --]]
-local Evade = {}
-
-function Evade:Draw()
-    local Count = Game.Engine:GetProjectileCount()
-
-    for i = 0, Count - 1 do
-        local Projectile = Game.Engine:GetProjectileAt(i)
-        local Info = Projectile:GetProjectileInfo()
-        local Velocity = Info:GetVelocity()
-        local Location3D = Info:GetLocation()
-        local Location2D = Math.XMFLOAT2(0, 0)
-
-        if not (W2S(Location3D, Location2D)) then goto Continue end
-
-        local Owner = Projectile:GetOwner()
-
-        Game.Renderer:DrawText(string.format("0x%X", Projectile:GetProjectileId()), Location2D.x, Location2D.y, 20, 0xFF00FF00, false)
-
-        ::Continue::
+function Genji:OnUpdate()
+    if (Genji.UsingDragonblade() > 0) then
+        Genji:TargetSelector(4)
+    else
+        Genji:TargetSelector(3)
     end
-end
 
-function OnDraw_Init()
-    Game.Settings.settings_draw_fov = true
-    Game.Settings.settings_esp_text = true
-    Game.Settings.settings_esp_skeleton = false
-    Game.Settings.settings_esp_skeleton_useraycast = false
-    Game.Settings.settings_esp_highlight = true
+    Genji.BestFov = Game.Engine:GetFov()
 
-    for Key in pairs(SkillDatabase) do
-        for Key2 in pairs(SkillDatabase[Key]) do
-            SkillDatabase[Key][Key2].Resource = Game.Renderer:LoadResource("UdyrPack\\Images\\Icons\\Skills\\" .. Key2 .. ".png")
+    if (Genji.BestTarget ~= nil) and (Genji.BestBone == -1) then
+        local Found = Game.Engine:FindBestBone(Genji.BestTarget, Genji.BestFov, 0x11, 1)
+                        
+        if (Found.bFound) then
+            Genji.BestFov = Found.lastFov
+            Genji.BestBone = Found.foundBone
         end
     end
-
-    for Key in pairs(HeroDatabase) do
-        HeroDatabase[Key].Resource = Game.Renderer:LoadResource("UdyrPack\\Images\\Icons\\Heroes\\" .. Key .. ".png")
-    end
-
-    OnDraw_Init_First = false
 end
 
-function Visuals()
+function Genji:DrawPrediction(Player)
+	local player = Player
+	local Mesh = player:GetMesh()
+	if (not Mesh) then
+		return
+	end
+	
+	local Health = player:GetHealth()
+	if (not Health or not (Health:GetLife().y > 0)) then
+		return
+	end
+	
+	local worldPos = Mesh:GetBonePos(player:GetBoneId(0x1))--Mesh:GetLocation()
+	local locPos = Game.Engine:GetViewMatrix():GetCameraVec()
+	local predicted = Math.Predict(locPos, worldPos, Mesh:GetVelocity(), 60, 0)
+	
+	local out = Math.XMFLOAT2(0, 0)
+	if not W2S(predicted, out) then
+		return
+	end
+    
+    Game.Renderer:DrawCircle(out.x, out.y, 7, 0xFF000000, 4)
+    Game.Renderer:DrawCircle(out.x, out.y, 7, 0xFF00FF00, 2)
+    Game.Renderer:DrawCircleFilled(out.x, out.y, 6, 0xFFFF0000)
+end
+
+function Genji:OnDraw()
     local Count = Game.Engine:GetPlayerCount()
 
     for i = 0, Count - 1 do
@@ -597,25 +754,57 @@ function Visuals()
 
         --check Alive
         if (Health and (HealthCurrent > 0) and Player:IsEnemy()) then
-            Visual:DrawESP(Player, 2) --BoxESP
-            Visual:DrawHealth(Player, HealthCurrent, HealthMax)
+            Genji:DrawPrediction(Player)
         end
     end
-
-    Visual:Awareness()
 end
 
 function OnUpdate()
     collectgarbage("collect")
+    Genji:OnUpdate()
+	Genji:AutoMelee()
+	Genji:AutoDash()
+    Genji:Aimbot(0.012, 0.01)
 end
 
 function OnDraw()
     collectgarbage("collect")
+    if (First_Init) then
+        Game.Engine:SetFov(Global_Fov)
+        First_Init = false;
+    end
+    --Genji:TargetSelector(4)
+    Genji:OnDraw()
+	Genji:OnUpdate()
+	--Genji:AutoDash()
+    local Pos2D = Math.XMFLOAT2(100, 100)
+    if (Genji.BestTarget ~= nil) then
+        if W2S(Genji.BestTarget:GetMesh():GetLocation(), Pos2D) then
+            Game.Renderer:DrawText("BestTarget: " .. Genji.BestTarget:GetIdentifier():GetHeroName(), Pos2D.x, Pos2D.y, 25, 0xFF80FFCF, true)
+        end
+    end
 
-    if (OnDraw_Init_First) then OnDraw_Init() end
-    Visuals()
-    
-    --Evade:Draw()
+    --Genji:AutoMelee()
+    Game.Renderer:DrawText(Game.Engine:GetLocalPlayer():GetSkill():GetSkillInfo(0x3D, 0x6):GetCoolTime().y, 400, 100, 35, 0xFFFFFF00, false)
+
+    if (Genji.BestBone ~= -1) then
+        local Mesh = Genji.BestTarget:GetMesh()
+        if (Mesh) then
+            local locPos = Game.Engine:GetViewMatrix():GetCameraVec()
+            local bonePos = Mesh:GetBonePos(Genji.BestBone)
+
+            if (Genji.UsingDragonblade() == 0) then
+                bonePos = Math.Predict(locPos, bonePos, Mesh:GetVelocity(), 60, 0)
+            end
+
+            local Control = Game.Engine:GetController()
+            local dstAngle = Math.LerpVec3(Control:GetAngle(), Math.NormalizeVec3(bonePos - locPos), 0.04)
+            local dsss = dst(Control:GetAngle(), Math.NormalizeVec3(bonePos - locPos))
+
+            Game.Renderer:DrawText("UdyrCustomPrediction", 100, 70, 25, 0xFF42F548, false)
+            Game.Renderer:DrawText("AngleDiff: " .. dsss, 100, 100, 25, 0xFF1873AB, false)
+        end
+    end
 end
 
 local Module = {

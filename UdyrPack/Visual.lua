@@ -34,13 +34,6 @@ function DrawShadowBox(PointX, PointY, Width, Height, LineColor, OutlineColor, L
     DrawBox(PointX, PointY, Width, Height, LineColor, LineThickness) --Line
 end
 
-function DrawFilledBox(PointX, PointY, Width, Height, Color, Thickness)
-    local Point1 = Math.XMFLOAT2(PointX, PointY)
-    local Point4 = Math.XMFLOAT2(PointX + Width, PointY + Height)
-    
-    Game.Renderer:DrawBoxFilled(Point1, Point4, Color, Thickness, -1)
-end
-
 function abs(v)
     return (v^2)^0.5
 end
@@ -350,15 +343,14 @@ local Visual = {
     Box_Visible_Color = 0xFF00FF00, --Green
     Box_Hidden_Color = 0xFFFF0000, --Red
     Box_Outline_Color = 0xFF000000, --Black
-    Box_Line_Thickness = 2,
+    Box_Line_Thickness = 1,
     Box_Outline_Thickness = 1,
-    Box_Filled_Color = 0x30444444, --Black
 
     --[[ Health ]]
     Health_Back_Color = 0xFF000000, --Black
     Health_Margin_Right = 3,
-    Health_Main_Thickness = 6,
-    Health_Back_Thickness = 8,
+    Health_Main_Thickness = 4,
+    Health_Back_Thickness = 6,
 
     --[[ Awareness ]]
     Awareness_Icon_Size = 36,
@@ -403,9 +395,6 @@ function Visual:DrawESP(Player, Box_Type)
     elseif (Box_Type == 1) then --Semi Box
         DrawShadowLine(PointLU, PointLD, Box_Color, self.Box_Outline_Color, self.Box_Line_Thickness, self.Box_Outline_Thickness)
         DrawShadowLine(PointLD, PointRD, Box_Color, self.Box_Outline_Color, self.Box_Line_Thickness, self.Box_Outline_Thickness)
-    elseif (Box_Type == 2) then --Filled Box
-        DrawShadowBox(PointLU.x, PointLU.y, Width2D, Height2D, Box_Color, self.Box_Outline_Color, self.Box_Line_Thickness, self.Box_Outline_Thickness)
-        DrawFilledBox(PointLU.x, PointLU.y, Width2D, Height2D, self.Box_Filled_Color, self.Box_Line_Thickness)
     end
 end
 
@@ -449,7 +438,7 @@ function Visual:DrawHealth(Player, HealthCurrent, HealthMax)
     local To2D = Math.XMFLOAT2(PointLU.x - self.Health_Margin_Right, PointLU.y + Thickness_Diff / 2 + Height2D)
     
     Game.Renderer:DrawBoxFilled(From2D, To2D, 0xFF000000, 0, 0)
-    --Game.Renderer:DrawText(HealthCurrent, From2D.x, From2D.y - 30, 20, 0xFFFFFFFF, false)
+
     From2D.x = From2D.x + round(Thickness_Diff / 2)
     From2D.y = To2D.y - Health_Main_Height
     To2D.x = To2D.x - round(Thickness_Diff / 2)
@@ -477,8 +466,8 @@ function Visual:Awareness()
     local BoxHeight = EnemyCount * (self.Awareness_Icon_Size + self.Awareness_Icon_Margin) + self.Awareness_Icon_Margin
     local FontSize = self.Awareness_Icon_Size * 0.6
     
-    local BoxFrom2D = Math.XMFLOAT2(0, tonumber(round(ScreenHeight / 2 - BoxHeight * 0.8) - 30))
-    local BoxTo2D = Math.XMFLOAT2(BoxWidth, tonumber(round(ScreenHeight / 2 + BoxHeight * 0.2)))
+    local BoxFrom2D = Math.XMFLOAT2(0, round(ScreenHeight / 2 - BoxHeight * 0.8) - 30)
+    local BoxTo2D = Math.XMFLOAT2(BoxWidth, round(ScreenHeight / 2 + BoxHeight * 0.2))
 
     Game.Renderer:DrawBoxFilled(BoxFrom2D, BoxTo2D, 0x9A0000000, 0, 0)
     Game.Renderer:DrawText("UdyrAwareness", BoxFrom2D.x + BoxWidth / 2, BoxFrom2D.y + self.Awareness_Icon_Margin, FontSize, 0xFFFAFF60, true)
@@ -597,7 +586,7 @@ function Visuals()
 
         --check Alive
         if (Health and (HealthCurrent > 0) and Player:IsEnemy()) then
-            Visual:DrawESP(Player, 2) --BoxESP
+            Visual:DrawESP(Player, 0) --BoxESP
             Visual:DrawHealth(Player, HealthCurrent, HealthMax)
         end
     end
@@ -614,7 +603,6 @@ function OnDraw()
 
     if (OnDraw_Init_First) then OnDraw_Init() end
     Visuals()
-    
     --Evade:Draw()
 end
 
